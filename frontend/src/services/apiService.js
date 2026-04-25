@@ -1,5 +1,7 @@
 // API Service for connecting to the backend
-const API_URL = "http://localhost:5000";
+const API_URL = process.env.NODE_ENV === "production" 
+  ? "https://ai-learning-engine.onrender.com"
+  : "http://localhost:5000";
 
 export const apiService = {
   // Upload PDF
