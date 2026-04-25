@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams } from "react-router-dom";
-import { Send, FileText } from "lucide-react";
+import { Send, FileText, AlertCircle } from "lucide-react";
 import ChatMessage from "../components/ChatMessage";
 import Loader from "../components/Loader";
+import { apiService } from "../services/apiService";
 
 export default function Chat() {
   const { docId } = useParams();
@@ -10,11 +11,12 @@ export default function Chat() {
     {
       id: 1,
       role: "assistant",
-      content: "Hello! I've analyzed your document. What would you like to know about it?"
+      content: "Hello! I've analyzed your document. What would you like to know about it? Ask me anything!"
     }
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -25,27 +27,45 @@ export default function Chat() {
     scrollToBottom();
   }, [messages, isLoading]);
 
-  const handleSend = (e) => {
+  const handleSend = async (e) => {
     e.preventDefault();
     if (!input.trim()) return;
 
-    const userMsg = { id: Date.now(), role: "user", content: input };
+    const userMessage = input.trim();
+    const userMsg = { id: Date.now(), role: "user", content: userMessage };
     setMessages(prev => [...prev, userMsg]);
     setInput("");
     setIsLoading(true);
+    setError("");
 
-    // Mock AI Response
-    setTimeout(() => {
+    try {
+      // Call the backend API
+      const response = await apiService.askQuestion(userMessage);
+      
       setMessages(prev => [
         ...prev,
         {
           id: Date.now() + 1,
           role: "assistant",
-          content: "Based on the notes you provided, the core concept revolves around optimizing specific pathways. This is a simulated response designed to show how the UI would look with a real backend integration."
+          content: response.answer
         }
       ]);
+    } catch (err) {
+      setError(err.message);
+      console.error("Chat error:", err);
+      
+      // Add error message to chat
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now() + 1,
+          role: "assistant",
+          content: `⚠️ Error: ${err.message}. Please try again or contact support.`
+        }
+      ]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -61,15 +81,15 @@ export default function Chat() {
           <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 mb-4">
             <h3 className="text-sm font-medium text-white mb-1">Active Document</h3>
             <p className="text-xs text-slate-400 truncate">Document ID: {docId}</p>
+            <p className="text-xs text-slate-500 mt-2">Connected to backend API</p>
           </div>
 
           <div className="flex-1 overflow-auto pr-2 custom-scrollbar text-sm text-slate-400 space-y-4">
-            <p className="border-l-2 border-indigo-500/30 pl-3">
-              "The mitochondria is the powerhouse of the cell, generating most of the chemical energy needed to power the cell's biochemical reactions..."
-            </p>
-            <p className="border-l-2 border-indigo-500/30 pl-3">
-              "Chemical energy produced by the mitochondria is stored in a small molecule called adenosine triphosphate (ATP)."
-            </p>
+            <p className="text-indigo-400 text-xs font-medium">💡 Tips:</p>
+            <p className="text-xs">• Ask specific questions about your document</p>
+            <p className="text-xs">• The AI reads from your uploaded PDF content</p>
+            <p className="text-xs">• Get summaries, explanations, and insights</p>
+            <p className="text-xs">• Verify important information in the original</p>
           </div>
         </div>
       </div>
@@ -79,7 +99,7 @@ export default function Chat() {
         
         {/* Header */}
         <div className="h-16 border-b border-white/5 flex items-center px-6 shrink-0 bg-white/[0.01]">
-          <h2 className="font-medium text-white">Chatting with your notes</h2>
+          <h2 className="font-medium text-white">💬 Chat with Your PDF</h2>
         </div>
 
         {/* Messages Area */}
@@ -90,6 +110,12 @@ export default function Chat() {
           {isLoading && (
             <div className="flex justify-start mb-6 w-full">
               <Loader />
+            </div>
+          )}
+          {error && (
+            <div className="mb-6 p-3 rounded-lg bg-red-500/10 border border-red-500/30 flex items-start gap-2">
+              <AlertCircle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
+              <p className="text-red-400 text-sm">{error}</p>
             </div>
           )}
           <div ref={messagesEndRef} />
@@ -105,7 +131,7 @@ export default function Chat() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask a question about your notes..."
+              placeholder="Ask about your PDF..."
               className="flex-1 bg-transparent border-none outline-none text-white px-4 py-2 placeholder:text-slate-500"
               disabled={isLoading}
             />
@@ -118,7 +144,7 @@ export default function Chat() {
             </button>
           </form>
           <p className="text-center text-[11px] text-slate-500 mt-3">
-            AI can make mistakes. Verify important information with your original notes.
+            Powered by OpenRouter AI • Verify important information with your original document
           </p>
         </div>
       

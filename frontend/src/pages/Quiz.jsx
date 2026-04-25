@@ -1,63 +1,50 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { BrainCircuit, Check, X, RefreshCw } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
-
-const MOCK_QUESTIONS = [
-  {
-    id: 1,
-    question: "What is the primary function of the mitochondria in a cell?",
-    options: [
-      "Protein synthesis",
-      "Generating chemical energy (ATP)",
-      "Storing genetic information",
-      "Cell waste disposal"
-    ],
-    correctAnswer: 1,
-    explanation: "Mitochondria generate most of the chemical energy needed to power the cell's biochemical reactions, stored as ATP."
-  },
-  {
-    id: 2,
-    question: "From whom is mitochondrial DNA generally inherited?",
-    options: [
-      "Only the father",
-      "Both parents equally",
-      "Only the mother",
-      "It is not inherited; it forms spontaneously"
-    ],
-    correctAnswer: 2,
-    explanation: "Mitochondrial DNA (mtDNA) is maternally inherited in humans and most other multicellular organisms."
-  }
-];
+import { apiService } from "../services/apiService";
 
 export default function Quiz() {
   const [searchParams] = useSearchParams();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [questions, setQuestions] = useState([]);
   const [hasQuiz, setHasQuiz] = useState(false);
   const [currentQ, setCurrentQ] = useState(0);
   const [selectedAns, setSelectedAns] = useState(null);
   const [score, setScore] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setIsGenerating(true);
-    setTimeout(() => {
+    setError(null);
+    try {
+      const result = await apiService.generateQuiz();
+      setQuestions(result.questions || []);
+      if (result.questions && result.questions.length > 0) {
+        setHasQuiz(true);
+      } else {
+        setError("No quiz questions generated. Try again.");
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
       setIsGenerating(false);
-      setHasQuiz(true);
-    }, 1500);
+    }
   };
 
   const handleSelect = (idx) => {
     if (selectedAns !== null) return; // Prevent multiple clicks
     setSelectedAns(idx);
-    if (idx === MOCK_QUESTIONS[currentQ].correctAnswer) {
+    const correctIdx = questions[currentQ].correct || 0;
+    if (idx === correctIdx) {
       setScore(s => s + 1);
     }
   };
 
   const nextQuestion = () => {
-    if (currentQ < MOCK_QUESTIONS.length - 1) {
+    if (currentQ < questions.length - 1) {
       setCurrentQ(c => c + 1);
       setSelectedAns(null);
     } else {
@@ -70,6 +57,8 @@ export default function Quiz() {
     setSelectedAns(null);
     setScore(0);
     setIsFinished(false);
+    setHasQuiz(false);
+    setQuestions([]);
   };
 
   return (
@@ -91,11 +80,17 @@ export default function Quiz() {
         )}
       </div>
 
+      {error && (
+        <div className="glass-card rounded-2xl p-4 text-red-400 border border-red-500/30">
+          Error: {error}
+        </div>
+      )}
+
       {!hasQuiz && !isGenerating && (
         <div className="border border-white/10 rounded-3xl p-16 text-center bg-white/[0.01]">
           <BrainCircuit size={48} className="mx-auto text-purple-400/50 mb-4" />
           <h3 className="text-xl font-medium text-white mb-2">No active quiz</h3>
-          <p className="text-slate-400">Click generate to automatically create a custom quiz based on your notes.</p>
+          <p className="text-slate-400">Click generate to automatically create a custom quiz based on your document.</p>
         </div>
       )}
 
@@ -106,19 +101,19 @@ export default function Quiz() {
         </div>
       )}
 
-      {hasQuiz && !isFinished && (
+      {hasQuiz && !isFinished && questions.length > 0 && (
         <div className="glass-card rounded-3xl p-8 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1 bg-white/5">
             <motion.div 
               className="h-full bg-purple-500" 
               initial={{ width: 0 }}
-              animate={{ width: `${((currentQ + (selectedAns !== null ? 1 : 0)) / MOCK_QUESTIONS.length) * 100}%` }}
+              animate={{ width: `${((currentQ + (selectedAns !== null ? 1 : 0)) / questions.length) * 100}%` }}
               transition={{ duration: 0.3 }}
             />
           </div>
 
           <div className="flex items-center justify-between mb-8 text-sm font-medium">
-            <span className="text-purple-400">Question {currentQ + 1} of {MOCK_QUESTIONS.length}</span>
+            <span className="text-purple-400">Question {currentQ + 1} of {questions.length}</span>
             <span className="text-slate-400">Score: {score}</span>
           </div>
 
@@ -131,13 +126,13 @@ export default function Quiz() {
               transition={{ duration: 0.3 }}
             >
               <h2 className="text-2xl font-semibold text-white mb-8 leading-snug">
-                {MOCK_QUESTIONS[currentQ].question}
+                {questions[currentQ].question}
               </h2>
 
               <div className="space-y-3 mb-8">
-                {MOCK_QUESTIONS[currentQ].options.map((opt, idx) => {
+                {questions[currentQ].options?.map((opt, idx) => {
                   const isSelected = selectedAns === idx;
-                  const isCorrectAnswer = idx === MOCK_QUESTIONS[currentQ].correctAnswer;
+                  const isCorrectAnswer = idx === (questions[currentQ].correct || 0);
                   
                   let optStyle = "bg-white/[0.03] border-white/10 text-slate-300 hover:bg-white/[0.06] hover:border-slate-500 cursor-pointer";
                   let icon = null;
@@ -177,14 +172,14 @@ export default function Quiz() {
                   className="p-5 rounded-xl bg-indigo-500/10 border border-indigo-500/20"
                 >
                   <p className="text-sm text-indigo-200 mb-4">
-                    <span className="font-bold">Explanation:</span> {MOCK_QUESTIONS[currentQ].explanation}
+                    <span className="font-bold">Explanation:</span> {questions[currentQ].explanation || "Well done!"}
                   </p>
                   <div className="flex justify-end">
                     <button 
                       onClick={nextQuestion}
                       className="px-6 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-colors"
                     >
-                      {currentQ < MOCK_QUESTIONS.length - 1 ? "Next Question" : "View Results"}
+                      {currentQ < questions.length - 1 ? "Next Question" : "View Results"}
                     </button>
                   </div>
                 </motion.div>
@@ -194,7 +189,7 @@ export default function Quiz() {
         </div>
       )}
 
-      {isFinished && (
+      {isFinished && questions.length > 0 && (
         <motion.div 
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -202,11 +197,11 @@ export default function Quiz() {
         >
           <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-500 p-[3px] mx-auto mb-6">
             <div className="w-full h-full bg-[#181a20] rounded-full flex items-center justify-center">
-              <span className="text-3xl font-bold text-white">{Math.round((score / MOCK_QUESTIONS.length) * 100)}%</span>
+              <span className="text-3xl font-bold text-white">{Math.round((score / questions.length) * 100)}%</span>
             </div>
           </div>
           <h2 className="text-3xl font-bold text-white mb-2">Quiz Completed!</h2>
-          <p className="text-slate-400 mb-8">You answered {score} out of {MOCK_QUESTIONS.length} questions correctly.</p>
+          <p className="text-slate-400 mb-8">You answered {score} out of {questions.length} questions correctly.</p>
           
           <button 
             onClick={restart}

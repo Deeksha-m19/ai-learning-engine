@@ -1,41 +1,52 @@
 import { useState, useRef, useEffect } from "react";
 import { Network, Search, ZoomIn, ZoomOut, Maximize } from "lucide-react";
 import { motion } from "framer-motion";
-
-const MOCK_NODES = [
-  { id: 1, label: "Cell Structure", x: 400, y: 300, type: "main" },
-  { id: 2, label: "Mitochondria", x: 250, y: 150, type: "sub" },
-  { id: 3, label: "Nucleus", x: 600, y: 180, type: "sub" },
-  { id: 4, label: "ATP Production", x: 100, y: 250, type: "detail" },
-  { id: 5, label: "mtDNA", x: 300, y: 50, type: "detail" },
-  { id: 6, label: "Chromosomes", x: 750, y: 120, type: "detail" },
-  { id: 7, label: "Ribosomes", x: 450, y: 450, type: "sub" },
-  { id: 8, label: "Protein Synthesis", x: 600, y: 550, type: "detail" },
-];
-
-const MOCK_EDGES = [
-  { source: 1, target: 2 },
-  { source: 1, target: 3 },
-  { source: 1, target: 7 },
-  { source: 2, target: 4 },
-  { source: 2, target: 5 },
-  { source: 3, target: 6 },
-  { source: 7, target: 8 },
-];
+import { apiService } from "../services/apiService";
 
 export default function ConceptGraph() {
   const [scale, setScale] = useState(1);
   const [isGenerating, setIsGenerating] = useState(false);
   const [graphReady, setGraphReady] = useState(false);
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]);
+  const [error, setError] = useState(null);
   
   const containerRef = useRef(null);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setIsGenerating(true);
-    setTimeout(() => {
-      setIsGenerating(false);
+    setError(null);
+    try {
+      const result = await apiService.generateConceptGraph();
+      // Create flowchart layout with hierarchical positioning
+      const positionedNodes = (result.nodes || []).map((node, i) => {
+        let x, y;
+        if (node.type === "main") {
+          x = 450;
+          y = 80;
+        } else if (node.type === "sub") {
+          const subIndex = i % 3;
+          x = 150 + subIndex * 300;
+          y = 250;
+        } else {
+          const detailIndex = i % 4;
+          x = 100 + detailIndex * 220;
+          y = 450;
+        }
+        return {
+          ...node,
+          x: node.x || x,
+          y: node.y || y
+        };
+      });
+      setNodes(positionedNodes);
+      setEdges(result.edges || []);
       setGraphReady(true);
-    }, 2000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const zoomIn = () => setScale(s => Math.min(s + 0.2, 2));
@@ -60,6 +71,12 @@ export default function ConceptGraph() {
           </button>
         )}
       </div>
+
+      {error && (
+        <div className="glass-card rounded-2xl p-4 text-red-400 border border-red-500/30">
+          Error: {error}
+        </div>
+      )}
 
       <div className="flex-1 glass-card rounded-3xl overflow-hidden relative border border-white/10 group">
         {!graphReady ? (
@@ -115,9 +132,9 @@ export default function ConceptGraph() {
               >
                 {/* Edges */}
                 <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                  {MOCK_EDGES.map((edge, i) => {
-                    const sourceNode = MOCK_NODES.find(n => n.id === edge.source);
-                    const targetNode = MOCK_NODES.find(n => n.id === edge.target);
+                  {edges.map((edge, i) => {
+                    const sourceNode = nodes.find(n => n.id === edge.source);
+                    const targetNode = nodes.find(n => n.id === edge.target);
                     if (!sourceNode || !targetNode) return null;
                     return (
                       <line 
@@ -134,7 +151,7 @@ export default function ConceptGraph() {
                 </svg>
 
                 {/* Nodes */}
-                {MOCK_NODES.map((node) => {
+                {nodes.map((node) => {
                   let bgColor = "bg-slate-800";
                   let ringColor = "ring-slate-700";
                   let size = "w-32 h-12";
@@ -155,7 +172,7 @@ export default function ConceptGraph() {
                       style={{ left: node.x, top: node.y }}
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      transition={{ type: "spring", delay: node.id * 0.1 }}
+                      transition={{ type: "spring", delay: (node.id % 5) * 0.1 }}
                       whileHover={{ scale: 1.05 }}
                     >
                       {node.label}
