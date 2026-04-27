@@ -7,7 +7,23 @@ const cors = require("cors");
 
 const app = express();
 app.use(express.json());
-app.use(cors());
+
+// CORS Configuration for production and development
+const corsOptions = {
+  origin: [
+    "http://localhost:5173",      // Vite dev server
+    "http://localhost:3000",      // Alternative dev port
+    "http://localhost:5000",      // Backend itself
+    "https://ai-learning-engine-dusky.vercel.app", // Production frontend (Vercel)
+    "https://ai-learning-engine.onrender.com", // Production frontend (Render)
+    "https://ai-learning-engine-backend.onrender.com" // If backend on different domain
+  ],
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+};
+
+app.use(cors(corsOptions));
 
 if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
