@@ -14,7 +14,7 @@ if (!fs.existsSync("uploads")) {
 }
 
 const upload = multer({ dest: "uploads/" });
-let chunks = [];
+const CHUNKS_FILE = "current_chunks.json";
 
 function splitText(text) {
   return text.split(/\n\s*\n/).filter(chunk => chunk.length > 100);
@@ -29,6 +29,26 @@ function getRelevantChunks(chunks, question) {
     .sort((a, b) => b.score - a.score)
     .slice(0, 5)
     .map(item => item.chunk);
+}
+
+function loadChunks() {
+  try {
+    if (fs.existsSync(CHUNKS_FILE)) {
+      const data = fs.readFileSync(CHUNKS_FILE, "utf-8");
+      return JSON.parse(data);
+    }
+  } catch (err) {
+    console.error("Error loading chunks:", err.message);
+  }
+  return [];
+}
+
+function saveChunks(chunks) {
+  try {
+    fs.writeFileSync(CHUNKS_FILE, JSON.stringify(chunks), "utf-8");
+  } catch (err) {
+    console.error("Error saving chunks:", err.message);
+  }
 }
 
 app.get("/", (req, res) => {
@@ -52,7 +72,8 @@ app.post("/upload", upload.single("file"), async (req, res) => {
       return res.status(400).json({ error: "No readable text found in PDF" });
     }
 
-    chunks = splitText(text);
+    const chunks = splitText(text);
+    saveChunks(chunks); // Save to file instead of memory
     fs.unlinkSync(req.file.path);
 
     res.json({
@@ -67,6 +88,7 @@ app.post("/upload", upload.single("file"), async (req, res) => {
 
 app.post("/ask", async (req, res) => {
   const { question } = req.body;
+  const chunks = loadChunks(); // Load from file
 
   if (!chunks.length) {
     return res.json({ answer: "Upload a PDF first" });
@@ -109,6 +131,7 @@ app.post("/ask", async (req, res) => {
 // Generate Summary
 app.post("/generate-summary", async (req, res) => {
   try {
+    const chunks = loadChunks(); // Load from file
     if (!chunks.length) {
       return res.json({ summary: "Upload a PDF first" });
     }
@@ -146,6 +169,7 @@ app.post("/generate-summary", async (req, res) => {
 // Generate Quiz
 app.post("/generate-quiz", async (req, res) => {
   try {
+    const chunks = loadChunks(); // Load from file
     if (!chunks.length) {
       return res.json({ questions: [] });
     }
@@ -213,6 +237,7 @@ function createFallbackQuestions() {
 // Generate Concept Graph
 app.post("/generate-concept-graph", async (req, res) => {
   try {
+    const chunks = loadChunks(); // Load from file
     if (!chunks.length) {
       return res.json({ nodes: [], edges: [] });
     }
@@ -264,6 +289,7 @@ app.post("/generate-concept-graph", async (req, res) => {
 // Generate Flashcards
 app.post("/generate-flashcards", async (req, res) => {
   try {
+    const chunks = loadChunks(); // Load from file
     if (!chunks.length) {
       return res.json({ flashcards: [] });
     }
