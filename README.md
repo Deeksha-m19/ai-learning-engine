@@ -1,7 +1,7 @@
 # AI Learning Engine
 
 ## 🚀 Live Demo  
-👉 ai-learning-engine-dusky.vercel.app
+👉https://ai-learning-engine-dusky.vercel.app
 
 A full-stack web application that helps users learn by uploading PDF documents and generating interactive learning materials including summaries, concept graphs, flashcards, and quizzes.
 
