@@ -68,7 +68,12 @@ function saveChunks(chunks) {
 }
 
 app.get("/", (req, res) => {
-  res.send("Backend running 🚀");
+  const apiKeyStatus = process.env.OPENROUTER_API_KEY ? "✅ Loaded" : "❌ Missing";
+  res.json({ 
+    status: "Backend running 🚀",
+    apiKey: apiKeyStatus,
+    timestamp: new Date().toISOString()
+  });
 });
 
 // SIMPLE WORKING PDF UPLOAD
